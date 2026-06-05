@@ -3,10 +3,16 @@ import 'package:flutter/material.dart';
 import '../../api/models/product_model.dart';
 
 class ProductTile extends StatelessWidget {
-  const ProductTile({required this.product, required this.onTap, super.key});
+  const ProductTile({
+    required this.product,
+    required this.onTap,
+    required this.onDelete,
+    super.key,
+  });
 
   final ProductModel product;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +54,10 @@ class ProductTile extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+            IconButton(
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline),
             ),
           ],
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:toastification/toastification.dart';
 
 import '../api/models/paginated_response.dart';
 import '../api/models/product_model.dart';
@@ -54,6 +55,52 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
 
+      ToastService.showToast(e.message);
+    }
+  }
+
+  void _confirmDelete(ProductModel product) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Supprimer le produit'),
+          content: Text('Voulez-vous vraiment supprimer "${product.name}" ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Supprimer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await _productRepository.delete(product.id);
+
+      if (!mounted) {
+        return;
+      }
+
+      ToastService.showToast(
+        'Produit supprimé',
+        type: ToastificationType.success,
+      );
+
+      _loadProducts();
+    } on ApiException catch (e) {
+      if (!mounted) {
+        return;
+      }
       ToastService.showToast(e.message);
     }
   }
@@ -115,6 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             _loadProducts();
           },
+          onDelete: () => _confirmDelete(product),
         );
       },
     );
