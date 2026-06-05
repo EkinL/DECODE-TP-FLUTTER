@@ -11,6 +11,7 @@ import '../config/routes.dart';
 import '../helpers/exceptions.dart';
 import '../services/toast_service.dart';
 import '../widgets/products/product_tile.dart';
+import '../widgets/products/product_tile_skeleton.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -240,8 +241,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 6,
+        itemBuilder: (BuildContext context, int index) {
+          return const ProductTileSkeleton();
+        },
       );
     }
 
