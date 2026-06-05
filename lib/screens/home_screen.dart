@@ -28,8 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _minPriceController = TextEditingController();
-  final TextEditingController _maxPriceController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   List<ProductModel> _products = [];
@@ -42,8 +40,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _debounce;
   String _searchValue = '';
 
-  double? _minPrice;
-  double? _maxPrice;
+  double? _priceMin;
+  double? _priceMax;
+  RangeValues? _priceRange;
+  bool _loadingBounds = false;
+
   DateTime? _createdBefore;
   DateTime? _updatedBefore;
 
@@ -58,8 +59,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
-    _minPriceController.dispose();
-    _maxPriceController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -208,18 +207,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  bool get _isPriceFiltered =>
+      _priceRange != null &&
+      _priceMin != null &&
+      _priceMax != null &&
+      (_priceRange!.start > _priceMin! || _priceRange!.end < _priceMax!);
+
   bool get _hasActiveFilters =>
-      _minPrice != null ||
-      _maxPrice != null ||
-      _createdBefore != null ||
-      _updatedBefore != null;
+      _isPriceFiltered || _createdBefore != null || _updatedBefore != null;
 
   List<ProductModel> _applyFilters(List<ProductModel> products) {
     return products.where((product) {
-      if (_minPrice != null && product.price < _minPrice!) {
-        return false;
-      }
-      if (_maxPrice != null && product.price > _maxPrice!) {
+      if (_priceRange != null &&
+          (product.price < _priceRange!.start ||
+              product.price > _priceRange!.end)) {
         return false;
       }
       if (_createdBefore != null &&
@@ -232,6 +233,52 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       return true;
     }).toList();
+  }
+
+  void _ensurePriceBounds() async {
+    if (_priceMax != null || _loadingBounds) {
+      return;
+    }
+
+    setState(() => _loadingBounds = true);
+
+    try {
+      final List<ProductModel> all = [];
+      int page = 1;
+
+      while (page <= 50) {
+        final PaginatedResponse<ProductModel> response =
+            await _productRepository.getAll(
+              queryParams: {'page': page.toString()},
+            );
+
+        all.addAll(response.rows);
+
+        if (response.rows.isEmpty || all.length >= response.count) {
+          break;
+        }
+        page++;
+      }
+
+      if (!mounted || all.isEmpty) {
+        return;
+      }
+
+      final List<double> prices = all.map((p) => p.price).toList()..sort();
+
+      setState(() {
+        _priceMin = prices.first;
+        _priceMax = prices.last;
+        _priceRange = RangeValues(prices.first, prices.last);
+        _loadingBounds = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _loadingBounds = false);
+      ToastService.showToast(e.message);
+    }
   }
 
   void _pickDate(DateTime? current, ValueChanged<DateTime> onPicked) async {
@@ -250,12 +297,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _resetFilters() {
     setState(() {
-      _minPrice = null;
-      _maxPrice = null;
+      if (_priceMin != null && _priceMax != null) {
+        _priceRange = RangeValues(_priceMin!, _priceMax!);
+      }
       _createdBefore = null;
       _updatedBefore = null;
-      _minPriceController.clear();
-      _maxPriceController.clear();
     });
   }
 
@@ -277,7 +323,10 @@ class _HomeScreenState extends State<HomeScreen> {
           Builder(
             builder: (BuildContext context) {
               return IconButton(
-                onPressed: () => Scaffold.of(context).openEndDrawer(),
+                onPressed: () {
+                  _ensurePriceBounds();
+                  Scaffold.of(context).openEndDrawer();
+                },
                 icon: Icon(
                   Icons.filter_list,
                   color: _hasActiveFilters ? colorScheme.primary : null,
@@ -322,6 +371,45 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildPriceFilter() {
+    if (_loadingBounds) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_priceRange == null || _priceMin == null || _priceMax == null) {
+      return const Text('Prix indisponible');
+    }
+
+    if (_priceMin! >= _priceMax!) {
+      return Text('Prix : ${_priceMin!.toStringAsFixed(0)} €');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Prix : ${_priceRange!.start.toStringAsFixed(0)} € — '
+          '${_priceRange!.end.toStringAsFixed(0)} €',
+        ),
+        RangeSlider(
+          values: _priceRange!,
+          min: _priceMin!,
+          max: _priceMax!,
+          labels: RangeLabels(
+            _priceRange!.start.toStringAsFixed(0),
+            _priceRange!.end.toStringAsFixed(0),
+          ),
+          onChanged: (RangeValues values) {
+            setState(() => _priceRange = values);
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildFilterDrawer(ColorScheme colorScheme) {
     return Drawer(
       child: SafeArea(
@@ -330,35 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text('Filtres', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
-            TextField(
-              controller: _minPriceController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Prix minimum',
-                border: OutlineInputBorder(),
-                suffixText: '€',
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _minPrice = double.tryParse(value.replaceAll(',', '.'));
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _maxPriceController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Prix maximum',
-                border: OutlineInputBorder(),
-                suffixText: '€',
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _maxPrice = double.tryParse(value.replaceAll(',', '.'));
-                });
-              },
-            ),
+            _buildPriceFilter(),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () =>
