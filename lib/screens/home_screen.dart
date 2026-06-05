@@ -27,9 +27,14 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   List<ProductModel> _products = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+
+  int _page = 1;
+  bool _hasMore = true;
 
   Timer? _debounce;
   String _searchValue = '';
@@ -37,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadProducts();
   }
 
@@ -44,7 +50,18 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    final bool nearBottom =
+        _scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200;
+
+    if (nearBottom) {
+      _loadMore();
+    }
   }
 
   void _onSearchChanged(String value) {
@@ -55,15 +72,21 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _loadProducts() async {
-    try {
-      final Map<String, String> queryParams = {};
-      if (_searchValue.isNotEmpty) {
-        queryParams['search_value'] = _searchValue;
-      }
+  Future<PaginatedResponse<ProductModel>> _fetchPage(int page) {
+    final Map<String, String> queryParams = {'page': page.toString()};
+    if (_searchValue.isNotEmpty) {
+      queryParams['search_value'] = _searchValue;
+    }
 
-      final PaginatedResponse<ProductModel> response = await _productRepository
-          .getAll(queryParams: queryParams.isEmpty ? null : queryParams);
+    return _productRepository.getAll(queryParams: queryParams);
+  }
+
+  void _loadProducts() async {
+    _page = 1;
+    _hasMore = true;
+
+    try {
+      final PaginatedResponse<ProductModel> response = await _fetchPage(1);
 
       if (!mounted) {
         return;
@@ -71,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _products = response.rows;
+        _hasMore = _products.length < response.count;
         _isLoading = false;
       });
     } on ApiException catch (e) {
@@ -80,6 +104,45 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _isLoading = false;
+      });
+
+      ToastService.showToast(e.message);
+    }
+  }
+
+  void _loadMore() async {
+    if (_isLoadingMore || !_hasMore) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    final int nextPage = _page + 1;
+
+    try {
+      final PaginatedResponse<ProductModel> response = await _fetchPage(
+        nextPage,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _page = nextPage;
+        _products.addAll(response.rows);
+        _hasMore = _products.length < response.count;
+        _isLoadingMore = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoadingMore = false;
       });
 
       ToastService.showToast(e.message);
@@ -193,9 +256,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: _products.length,
+      itemCount: _products.length + (_hasMore ? 1 : 0),
       itemBuilder: (BuildContext context, int index) {
+        if (index >= _products.length) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
         final ProductModel product = _products[index];
 
         return ProductTile(
