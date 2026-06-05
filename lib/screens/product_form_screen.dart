@@ -10,7 +10,9 @@ import '../services/toast_service.dart';
 import '../widgets/buttons/loading_button.dart';
 
 class ProductFormScreen extends StatefulWidget {
-  const ProductFormScreen({super.key});
+  const ProductFormScreen({this.productId, super.key});
+
+  final String? productId;
 
   @override
   State<ProductFormScreen> createState() => _ProductFormScreenState();
@@ -19,16 +21,30 @@ class ProductFormScreen extends StatefulWidget {
 class _ProductFormScreenState extends State<ProductFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final ModelRepository<ProductModel> _productRepository = const ModelRepository(
-    uri: 'products',
-    fromJson: ProductModel.fromJson,
-  );
+  final ModelRepository<ProductModel> _productRepository =
+      const ModelRepository(
+        uri: 'products',
+        fromJson: ProductModel.fromJson,
+      );
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
 
+  bool _isLoading = false;
   bool _isSubmitted = false;
+
+  bool get _isEditing => widget.productId != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (_isEditing) {
+      _isLoading = true;
+      _loadProduct();
+    }
+  }
 
   @override
   void dispose() {
@@ -38,55 +54,87 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     super.dispose();
   }
 
+  void _loadProduct() async {
+    try {
+      final ProductModel product = await _productRepository.get(
+        widget.productId!,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _nameController.text = product.name;
+      _descriptionController.text = product.description;
+      _priceController.text = product.price.toString();
+
+      setState(() {
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ToastService.showToast(e.message);
+      context.pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ajouter un produit'),
+        title: Text(_isEditing ? 'Modifier le produit' : 'Ajouter un produit'),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              spacing: 16,
-              children: [
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nom du produit',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: isRequired,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _buildForm(),
+    );
+  }
+
+  Widget _buildForm() {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            spacing: 16,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nom du produit',
+                  border: OutlineInputBorder(),
                 ),
-                TextFormField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
-                  ),
-                  maxLines: 4,
-                  validator: isRequired,
+                validator: isRequired,
+              ),
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
                 ),
-                TextFormField(
-                  controller: _priceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Prix',
-                    border: OutlineInputBorder(),
-                    suffixText: '€',
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: isPrice,
+                maxLines: 4,
+                validator: isRequired,
+              ),
+              TextFormField(
+                controller: _priceController,
+                decoration: const InputDecoration(
+                  labelText: 'Prix',
+                  border: OutlineInputBorder(),
+                  suffixText: '€',
                 ),
-                LoadingButton(
-                  onPressed: _onSubmit,
-                  label: 'Enregistrer',
-                  isLoading: _isSubmitted,
-                ),
-              ],
-            ),
+                keyboardType: TextInputType.number,
+                validator: isPrice,
+              ),
+              LoadingButton(
+                onPressed: _onSubmit,
+                label: 'Enregistrer',
+                isLoading: _isSubmitted,
+              ),
+            ],
           ),
         ),
       ),
@@ -104,6 +152,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
     try {
       await _productRepository.addOrUpdate(
+        id: widget.productId,
         data: {
           'name': _nameController.text,
           'description': _descriptionController.text,
@@ -116,7 +165,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       }
 
       ToastService.showToast(
-        'Produit créé avec succès',
+        _isEditing ? 'Produit modifié avec succès' : 'Produit créé avec succès',
         type: ToastificationType.success,
       );
 

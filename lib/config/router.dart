@@ -46,5 +46,16 @@ final GoRouter router = GoRouter(
         return buildPage(context, state, const ProductFormScreen());
       },
     ),
+    GoRoute(
+      path: rtProductEdit,
+      redirect: isAuthenticated,
+      pageBuilder: (context, state) {
+        return buildPage(
+          context,
+          state,
+          ProductFormScreen(productId: state.pathParameters['id']),
+        );
+      },
+    ),
   ],
 );

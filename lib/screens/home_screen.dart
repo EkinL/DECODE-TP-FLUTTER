@@ -17,10 +17,11 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final ModelRepository<ProductModel> _productRepository = const ModelRepository(
-    uri: 'products',
-    fromJson: ProductModel.fromJson,
-  );
+  final ModelRepository<ProductModel> _productRepository =
+      const ModelRepository(
+        uri: 'products',
+        fromJson: ProductModel.fromJson,
+      );
 
   List<ProductModel> _products = [];
   bool _isLoading = true;
@@ -33,8 +34,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _loadProducts() async {
     try {
-      final PaginatedResponse<ProductModel> response =
-          await _productRepository.getAll();
+      final PaginatedResponse<ProductModel> response = await _productRepository
+          .getAll();
 
       if (!mounted) {
         return;
@@ -101,7 +102,20 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(16),
       itemCount: _products.length,
       itemBuilder: (BuildContext context, int index) {
-        return ProductTile(product: _products[index]);
+        final ProductModel product = _products[index];
+
+        return ProductTile(
+          product: product,
+          onTap: () async {
+            await context.push('/products/${product.id}/edit');
+
+            if (!mounted) {
+              return;
+            }
+
+            _loadProducts();
+          },
+        );
       },
     );
   }

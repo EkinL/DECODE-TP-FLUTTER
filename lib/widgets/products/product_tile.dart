@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../api/models/product_model.dart';
 
 class ProductTile extends StatelessWidget {
-  const ProductTile({required this.product, super.key});
+  const ProductTile({required this.product, required this.onTap, super.key});
 
   final ProductModel product;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -15,38 +16,41 @@ class ProductTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: colorScheme.surfaceContainer,
-      child: Row(
-        children: [
-          SizedBox(
-            width: 100,
-            height: 100,
-            child: _buildImage(colorScheme),
-          ),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 8,
-                children: [
-                  Text(
-                    product.name,
-                    style: textTheme.titleMedium,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    '${product.price.toStringAsFixed(2)} €',
-                    style: textTheme.titleSmall?.copyWith(
-                      color: colorScheme.primary,
+      child: InkWell(
+        onTap: onTap,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 100,
+              height: 100,
+              child: _buildImage(colorScheme),
+            ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 8,
+                  children: [
+                    Text(
+                      product.name,
+                      style: textTheme.titleMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                    Text(
+                      '${product.price.toStringAsFixed(2)} €',
+                      style: textTheme.titleSmall?.copyWith(
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
