@@ -32,27 +32,31 @@ class _ProductTileSkeletonState extends State<ProductTileSkeleton>
     final Color boxColor = colorScheme.surfaceContainerHighest;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      color: colorScheme.surfaceContainer,
+      margin: const EdgeInsets.only(bottom: 12),
       child: FadeTransition(
         opacity: Tween<double>(begin: 0.4, end: 1).animate(_controller),
-        child: Row(
-          children: [
-            Container(width: 100, height: 100, color: boxColor),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Container(width: 72, height: 72, color: boxColor),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   spacing: 10,
                   children: [
                     _bar(boxColor, double.infinity),
-                    _bar(boxColor, 80),
+                    _bar(boxColor, 120),
+                    _bar(boxColor, 60),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -14,42 +14,67 @@ class ProductTile extends StatelessWidget {
     final TextTheme textTheme = Theme.of(context).textTheme;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      color: colorScheme.surfaceContainer,
+      margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: onTap,
-        child: Row(
-          children: [
-            SizedBox(
-              width: 100,
-              height: 100,
-              child: _buildImage(colorScheme),
-            ),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: _buildImage(colorScheme),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 8,
+                  spacing: 6,
                   children: [
                     Text(
                       product.name,
-                      style: textTheme.titleMedium,
-                      maxLines: 2,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      '${product.price.toStringAsFixed(2)} €',
-                      style: textTheme.titleSmall?.copyWith(
-                        color: colorScheme.primary,
+                      product.description,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${product.price.toStringAsFixed(2)} €',
+                        style: textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );
@@ -59,7 +84,7 @@ class ProductTile extends StatelessWidget {
     if (product.picture == null) {
       return Container(
         color: colorScheme.surfaceContainerHighest,
-        child: const Icon(Icons.image_not_supported_outlined),
+        child: Icon(Icons.image_outlined, color: colorScheme.onSurfaceVariant),
       );
     }
 
@@ -69,7 +94,10 @@ class ProductTile extends StatelessWidget {
       errorBuilder: (context, error, stackTrace) {
         return Container(
           color: colorScheme.surfaceContainerHighest,
-          child: const Icon(Icons.broken_image_outlined),
+          child: Icon(
+            Icons.broken_image_outlined,
+            color: colorScheme.onSurfaceVariant,
+          ),
         );
       },
     );

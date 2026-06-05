@@ -10,6 +10,7 @@ import '../api/repositories/model_repository.dart';
 import '../config/routes.dart';
 import '../helpers/exceptions.dart';
 import '../services/toast_service.dart';
+import '../widgets/animated_entrance.dart';
 import '../widgets/products/product_tile.dart';
 import '../widgets/products/product_tile_skeleton.dart';
 
@@ -29,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  final Set<String> _animatedIds = {};
 
   List<ProductModel> _products = [];
   bool _isLoading = true;
@@ -348,7 +351,6 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: const InputDecoration(
                 hintText: 'Rechercher un produit',
                 prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
               ),
             ),
           ),
@@ -494,35 +496,43 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
+        final ColorScheme colorScheme = Theme.of(context).colorScheme;
         final ProductModel product = visible[index];
+        final bool animate = _animatedIds.add(product.id);
+
+        Widget tile = ProductTile(
+          product: product,
+          onTap: () async {
+            await context.push('/products/${product.id}/edit');
+
+            if (!mounted) {
+              return;
+            }
+
+            _loadProducts();
+          },
+        );
+
+        if (animate) {
+          tile = AnimatedEntrance(child: tile);
+        }
 
         return Dismissible(
           key: ValueKey(product.id),
           direction: DismissDirection.endToStart,
           background: Container(
             alignment: Alignment.centerRight,
-            margin: const EdgeInsets.only(bottom: 16),
+            margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.symmetric(horizontal: 24),
             decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(12),
+              color: colorScheme.error,
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.delete, color: Colors.white),
+            child: Icon(Icons.delete, color: colorScheme.onError),
           ),
           confirmDismiss: (direction) => _confirmDelete(product),
           onDismissed: (direction) => _deleteProduct(product),
-          child: ProductTile(
-            product: product,
-            onTap: () async {
-              await context.push('/products/${product.id}/edit');
-
-              if (!mounted) {
-                return;
-              }
-
-              _loadProducts();
-            },
-          ),
+          child: tile,
         );
       },
     );

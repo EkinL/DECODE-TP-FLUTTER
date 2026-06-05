@@ -10,7 +10,6 @@ enum StorageKey {
 }
 
 class StorageService {
-
   static Future<String?> get(StorageKey key) async {
     final prefs = await SharedPreferences.getInstance();
 

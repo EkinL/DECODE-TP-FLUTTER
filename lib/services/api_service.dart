@@ -78,7 +78,7 @@ class ApiService {
     } on http.ClientException catch (e) {
       throw ApiException(httpStatus: 0, message: 'Erreur réseau: $e');
     } catch (e) {
-      if(kDebugMode) {
+      if (kDebugMode) {
         print(e);
       }
       throw ApiException(httpStatus: 0, message: 'Erreur inattendue: $e');

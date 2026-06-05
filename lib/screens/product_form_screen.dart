@@ -11,6 +11,7 @@ import '../api/repositories/model_repository.dart';
 import '../helpers/exceptions.dart';
 import '../helpers/validators.dart';
 import '../services/toast_service.dart';
+import '../widgets/animated_entrance.dart';
 import '../widgets/buttons/loading_button.dart';
 
 class ProductFormScreen extends StatefulWidget {
@@ -127,46 +128,45 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            spacing: 16,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nom du produit',
-                  border: OutlineInputBorder(),
+        child: AnimatedEntrance(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              spacing: 16,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom du produit',
+                  ),
+                  validator: isRequired,
                 ),
-                validator: isRequired,
-              ),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    alignLabelWithHint: true,
+                  ),
+                  maxLines: 4,
+                  validator: isRequired,
                 ),
-                maxLines: 4,
-                validator: isRequired,
-              ),
-              TextFormField(
-                controller: _priceController,
-                decoration: const InputDecoration(
-                  labelText: 'Prix',
-                  border: OutlineInputBorder(),
-                  suffixText: '€',
+                TextFormField(
+                  controller: _priceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Prix',
+                    suffixText: '€',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: isPrice,
                 ),
-                keyboardType: TextInputType.number,
-                validator: isPrice,
-              ),
-              _buildImageSection(),
-              LoadingButton(
-                onPressed: _onSubmit,
-                label: 'Enregistrer',
-                isLoading: _isSubmitted,
-              ),
-            ],
+                _buildImageSection(),
+                LoadingButton(
+                  onPressed: _onSubmit,
+                  label: 'Enregistrer',
+                  isLoading: _isSubmitted,
+                ),
+              ],
+            ),
           ),
         ),
       ),
