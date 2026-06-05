@@ -4,12 +4,16 @@ class ProductModel {
   final String description;
   final double price;
   final String? picture;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   const ProductModel({
     required this.id,
     required this.name,
     required this.description,
     required this.price,
+    required this.createdAt,
+    required this.updatedAt,
     this.picture,
   });
 
@@ -21,6 +25,8 @@ class ProductModel {
       // L'API renvoie le prix sous forme de String (ex: "230.99")
       price: double.parse(json['price'].toString()),
       picture: json['picture'],
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
     );
   }
 }

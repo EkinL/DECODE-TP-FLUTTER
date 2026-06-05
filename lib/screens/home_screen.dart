@@ -28,6 +28,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _minPriceController = TextEditingController();
+  final TextEditingController _maxPriceController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   List<ProductModel> _products = [];
@@ -40,6 +42,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _debounce;
   String _searchValue = '';
 
+  double? _minPrice;
+  double? _maxPrice;
+  DateTime? _createdBefore;
+  DateTime? _updatedBefore;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +58,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _minPriceController.dispose();
+    _maxPriceController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -199,6 +208,63 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  bool get _hasActiveFilters =>
+      _minPrice != null ||
+      _maxPrice != null ||
+      _createdBefore != null ||
+      _updatedBefore != null;
+
+  List<ProductModel> _applyFilters(List<ProductModel> products) {
+    return products.where((product) {
+      if (_minPrice != null && product.price < _minPrice!) {
+        return false;
+      }
+      if (_maxPrice != null && product.price > _maxPrice!) {
+        return false;
+      }
+      if (_createdBefore != null &&
+          !product.createdAt.isBefore(_createdBefore!)) {
+        return false;
+      }
+      if (_updatedBefore != null &&
+          !product.updatedAt.isBefore(_updatedBefore!)) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  void _pickDate(DateTime? current, ValueChanged<DateTime> onPicked) async {
+    final DateTime now = DateTime.now();
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: current ?? now,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(now.year + 1),
+    );
+
+    if (picked != null) {
+      setState(() => onPicked(picked));
+    }
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _minPrice = null;
+      _maxPrice = null;
+      _createdBefore = null;
+      _updatedBefore = null;
+      _minPriceController.clear();
+      _maxPriceController.clear();
+    });
+  }
+
+  String _formatDate(DateTime date) {
+    final String day = date.day.toString().padLeft(2, '0');
+    final String month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
@@ -207,8 +273,22 @@ class _HomeScreenState extends State<HomeScreen> {
       key: const ValueKey('home_screen'),
       appBar: AppBar(
         title: const Text('Liste des produits'),
+        actions: [
+          Builder(
+            builder: (BuildContext context) {
+              return IconButton(
+                onPressed: () => Scaffold.of(context).openEndDrawer(),
+                icon: Icon(
+                  Icons.filter_list,
+                  color: _hasActiveFilters ? colorScheme.primary : null,
+                ),
+              );
+            },
+          ),
+        ],
       ),
       backgroundColor: colorScheme.surface,
+      endDrawer: _buildFilterDrawer(colorScheme),
       body: Column(
         children: [
           Padding(
@@ -242,6 +322,78 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildFilterDrawer(ColorScheme colorScheme) {
+    return Drawer(
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Filtres', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _minPriceController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Prix minimum',
+                border: OutlineInputBorder(),
+                suffixText: '€',
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _minPrice = double.tryParse(value.replaceAll(',', '.'));
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _maxPriceController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Prix maximum',
+                border: OutlineInputBorder(),
+                suffixText: '€',
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _maxPrice = double.tryParse(value.replaceAll(',', '.'));
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  _pickDate(_createdBefore, (date) => _createdBefore = date),
+              icon: const Icon(Icons.calendar_today),
+              label: Text(
+                _createdBefore == null
+                    ? 'Créé avant le...'
+                    : 'Créé avant le ${_formatDate(_createdBefore!)}',
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  _pickDate(_updatedBefore, (date) => _updatedBefore = date),
+              icon: const Icon(Icons.calendar_today),
+              label: Text(
+                _updatedBefore == null
+                    ? 'Modifié avant le...'
+                    : 'Modifié avant le ${_formatDate(_updatedBefore!)}',
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (_hasActiveFilters)
+              TextButton.icon(
+                onPressed: _resetFilters,
+                icon: const Icon(Icons.clear),
+                label: const Text('Réinitialiser les filtres'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBody() {
     if (_isLoading) {
       return ListView.builder(
@@ -253,10 +405,17 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    if (_products.isEmpty) {
+    final List<ProductModel> visible = _applyFilters(_products);
+
+    if (visible.isEmpty) {
+      if (_hasMore) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _loadMore());
+        return const Center(child: CircularProgressIndicator());
+      }
+
       return Center(
         child: Text(
-          _searchValue.isEmpty
+          _searchValue.isEmpty && !_hasActiveFilters
               ? 'Aucun produit pour le moment'
               : 'Aucun produit trouvé',
         ),
@@ -266,16 +425,16 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: _products.length + (_hasMore ? 1 : 0),
+      itemCount: visible.length + (_hasMore ? 1 : 0),
       itemBuilder: (BuildContext context, int index) {
-        if (index >= _products.length) {
+        if (index >= visible.length) {
           return const Padding(
             padding: EdgeInsets.all(16),
             child: Center(child: CircularProgressIndicator()),
           );
         }
 
-        final ProductModel product = _products[index];
+        final ProductModel product = visible[index];
 
         return Dismissible(
           key: ValueKey(product.id),
