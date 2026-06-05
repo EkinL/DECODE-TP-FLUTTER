@@ -62,7 +62,6 @@ class ProductTile extends StatelessWidget {
     return Image.network(
       product.picture!,
       fit: BoxFit.cover,
-      // Évite un écran cassé si l'URL de l'image est invalide
       errorBuilder: (context, error, stackTrace) {
         return Container(
           color: colorScheme.surfaceContainerHighest,

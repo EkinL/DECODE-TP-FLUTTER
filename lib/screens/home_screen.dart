@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../api/models/paginated_response.dart';
 import '../api/models/product_model.dart';
 import '../api/repositories/model_repository.dart';
+import '../config/routes.dart';
 import '../helpers/exceptions.dart';
 import '../services/toast_service.dart';
 import '../widgets/products/product_tile.dart';
@@ -66,6 +68,19 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       backgroundColor: colorScheme.surface,
       body: _buildBody(),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await context.push(rtProductCreate);
+
+          if (!mounted) {
+            return;
+          }
+
+          _loadProducts();
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Ajouter un produit'),
+      ),
     );
   }
 

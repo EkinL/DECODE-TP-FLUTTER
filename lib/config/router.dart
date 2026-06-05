@@ -6,6 +6,7 @@ import '../helpers/middlewares.dart';
 import '../screens/home_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/not_found_screen.dart';
+import '../screens/product_form_screen.dart';
 import 'routes.dart';
 
 Page buildPage(BuildContext context, GoRouterState state, Widget child) {
@@ -36,6 +37,13 @@ final GoRouter router = GoRouter(
       redirect: isAuthenticated,
       pageBuilder: (context, state) {
         return const NoTransitionPage(child: HomeScreen());
+      },
+    ),
+    GoRoute(
+      path: rtProductCreate,
+      redirect: isAuthenticated,
+      pageBuilder: (context, state) {
+        return buildPage(context, state, const ProductFormScreen());
       },
     ),
   ],

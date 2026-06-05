@@ -11,4 +11,26 @@ String? isEmail(String? value) {
   return null;
 }
 
-// TODO: Ajouter d'autres validateurs
+String? isRequired(String? value) {
+  if (value == null || value.trim().isEmpty) {
+    return 'Ce champ est obligatoire';
+  }
+  return null;
+}
+
+String? isPrice(String? value) {
+  final String? requiredError = isRequired(value);
+  if (requiredError != null) {
+    return requiredError;
+  }
+
+  final double? price = double.tryParse(value!.replaceAll(',', '.'));
+
+  if (price == null) {
+    return 'Le prix doit être un nombre';
+  }
+  if (price <= 0) {
+    return 'Le prix doit être supérieur à 0';
+  }
+  return null;
+}
