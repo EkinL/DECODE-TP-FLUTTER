@@ -24,7 +24,6 @@ class AuthResponse {
 }
 
 class AuthRepository {
-
   Future authenticate(Map<String, dynamic> data) {
     return ApiService().request(
       httpMethod: .post,
@@ -34,7 +33,7 @@ class AuthRepository {
     );
   }
 
-  Future refreshUser(String token){
+  Future refreshUser(String token) {
     return ApiService().request(
       httpMethod: .post,
       uri: 'refresh',

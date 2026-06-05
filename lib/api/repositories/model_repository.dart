@@ -7,7 +7,9 @@ class ModelRepository<T> {
 
   const ModelRepository({required this.uri, required this.fromJson});
 
-  Future<PaginatedResponse<T>> getAll({Map<String, String>? queryParams}) async {
+  Future<PaginatedResponse<T>> getAll({
+    Map<String, String>? queryParams,
+  }) async {
     return ApiService().request(
       uri: uri,
       httpMethod: HttpMethod.get,

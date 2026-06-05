@@ -21,11 +21,11 @@ class NotFoundScreen extends StatelessWidget {
           children: [
             const Text('Oops! The page you are looking for does not exist.'),
             ElevatedButton(
-              onPressed: (){
+              onPressed: () {
                 context.go(rtHome);
               },
               child: const Text('Retour à l\'accueil'),
-            )
+            ),
           ],
         ),
       ),
