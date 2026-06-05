@@ -69,7 +69,7 @@ class ApiService {
           );
           break;
         case HttpMethod.delete:
-          response = await client.delete(url, headers: headers);
+          response = await client.delete(url, body: body, headers: headers);
           break;
         default:
           response = await client.get(url, headers: headers);

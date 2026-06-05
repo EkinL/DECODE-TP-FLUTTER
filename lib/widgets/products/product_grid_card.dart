@@ -7,12 +7,16 @@ class ProductGridCard extends StatelessWidget {
     required this.product,
     required this.onTap,
     required this.onDelete,
+    this.onLongPress,
+    this.selected = false,
     super.key,
   });
 
   final ProductModel product;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback? onLongPress;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -21,8 +25,10 @@ class ProductGridCard extends StatelessWidget {
 
     return Card(
       margin: EdgeInsets.zero,
+      color: selected ? colorScheme.primaryContainer : null,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -31,6 +37,15 @@ class ProductGridCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   _buildImage(colorScheme),
+                  if (selected)
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Icon(
+                        Icons.check_circle,
+                        color: colorScheme.primary,
+                      ),
+                    ),
                   Positioned(
                     top: 6,
                     right: 6,
