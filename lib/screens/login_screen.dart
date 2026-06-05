@@ -44,6 +44,12 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               spacing: 16,
               children: [
+                const CircleAvatar(
+                  radius: 56,
+                  backgroundImage: NetworkImage(
+                    'https://avatars.githubusercontent.com/u/35110724?v=4',
+                  ),
+                ),
                 const Text(
                   'Se connecter',
                   style: TextStyle(
