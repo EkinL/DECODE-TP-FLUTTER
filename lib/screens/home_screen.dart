@@ -320,41 +320,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       key: const ValueKey('home_screen'),
-      appBar: AppBar(
-        title: const Text('Liste des produits'),
-        actions: [
-          Builder(
-            builder: (BuildContext context) {
-              return IconButton(
-                onPressed: () {
-                  _ensurePriceBounds();
-                  Scaffold.of(context).openEndDrawer();
-                },
-                icon: Icon(
-                  Icons.filter_list,
-                  color: _hasActiveFilters ? colorScheme.primary : null,
-                ),
-              );
-            },
-          ),
-        ],
-      ),
       backgroundColor: colorScheme.surface,
       endDrawer: _buildFilterDrawer(colorScheme),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              decoration: const InputDecoration(
-                hintText: 'Rechercher un produit',
-                prefixIcon: Icon(Icons.search),
-              ),
-            ),
-          ),
-          Expanded(child: _buildBody()),
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          _buildSliverAppBar(colorScheme),
+          ..._buildContentSlivers(),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -369,6 +341,84 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         icon: const Icon(Icons.add),
         label: const Text('Ajouter un produit'),
+      ),
+    );
+  }
+
+  Widget _buildSliverAppBar(ColorScheme colorScheme) {
+    return SliverAppBar(
+      pinned: true,
+      expandedHeight: 220,
+      backgroundColor: colorScheme.primary,
+      foregroundColor: colorScheme.onPrimary,
+      surfaceTintColor: Colors.transparent,
+      actions: [
+        Builder(
+          builder: (BuildContext context) {
+            return IconButton(
+              onPressed: () {
+                _ensurePriceBounds();
+                Scaffold.of(context).openEndDrawer();
+              },
+              icon: Badge(
+                isLabelVisible: _hasActiveFilters,
+                child: const Icon(Icons.filter_list),
+              ),
+            );
+          },
+        ),
+      ],
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsetsDirectional.only(start: 20, bottom: 84),
+        title: Text(
+          'Mes produits',
+          style: TextStyle(
+            color: colorScheme.onPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        background: _buildHeroBackground(colorScheme),
+      ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(72),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: TextField(
+            controller: _searchController,
+            onChanged: _onSearchChanged,
+            decoration: InputDecoration(
+              hintText: 'Rechercher un produit',
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: colorScheme.surface,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroBackground(ColorScheme colorScheme) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colorScheme.primary, colorScheme.tertiary],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -16,
+            top: -8,
+            child: Icon(
+              Icons.shopping_bag_outlined,
+              size: 170,
+              color: colorScheme.onPrimary.withValues(alpha: 0.12),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -456,15 +506,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBody() {
+  List<Widget> _buildContentSlivers() {
     if (_isLoading) {
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: 6,
-        itemBuilder: (BuildContext context, int index) {
-          return const ProductTileSkeleton();
-        },
-      );
+      return [
+        SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverList.builder(
+            itemCount: 6,
+            itemBuilder: (BuildContext context, int index) {
+              return const ProductTileSkeleton();
+            },
+          ),
+        ),
+      ];
     }
 
     final List<ProductModel> visible = _applyFilters(_products);
@@ -472,69 +526,85 @@ class _HomeScreenState extends State<HomeScreen> {
     if (visible.isEmpty) {
       if (_hasMore) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _loadMore());
-        return const Center(child: CircularProgressIndicator());
+        return const [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ];
       }
 
-      return Center(
-        child: Text(
-          _searchValue.isEmpty && !_hasActiveFilters
-              ? 'Aucun produit pour le moment'
-              : 'Aucun produit trouvé',
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Text(
+              _searchValue.isEmpty && !_hasActiveFilters
+                  ? 'Aucun produit pour le moment'
+                  : 'Aucun produit trouvé',
+            ),
+          ),
         ),
-      );
+      ];
     }
 
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(16),
-      itemCount: visible.length + (_hasMore ? 1 : 0),
-      itemBuilder: (BuildContext context, int index) {
-        if (index >= visible.length) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final ColorScheme colorScheme = Theme.of(context).colorScheme;
-        final ProductModel product = visible[index];
-        final bool animate = _animatedIds.add(product.id);
-
-        Widget tile = ProductTile(
-          product: product,
-          onTap: () async {
-            await context.push('/products/${product.id}/edit');
-
-            if (!mounted) {
-              return;
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.all(16),
+        sliver: SliverList.builder(
+          itemCount: visible.length + (_hasMore ? 1 : 0),
+          itemBuilder: (BuildContext context, int index) {
+            if (index >= visible.length) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
             }
 
-            _loadProducts();
+            return _buildTile(visible[index]);
           },
-        );
+        ),
+      ),
+    ];
+  }
 
-        if (animate) {
-          tile = AnimatedEntrance(child: tile);
+  Widget _buildTile(ProductModel product) {
+    final ColorScheme colorScheme = Theme.of(context).colorScheme;
+    final bool animate = _animatedIds.add(product.id);
+
+    Widget tile = ProductTile(
+      product: product,
+      onTap: () async {
+        await context.push('/products/${product.id}/edit');
+
+        if (!mounted) {
+          return;
         }
 
-        return Dismissible(
-          key: ValueKey(product.id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            decoration: BoxDecoration(
-              color: colorScheme.error,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Icon(Icons.delete, color: colorScheme.onError),
-          ),
-          confirmDismiss: (direction) => _confirmDelete(product),
-          onDismissed: (direction) => _deleteProduct(product),
-          child: tile,
-        );
+        _loadProducts();
       },
+    );
+
+    if (animate) {
+      tile = AnimatedEntrance(child: tile);
+    }
+
+    return Dismissible(
+      key: ValueKey(product.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        decoration: BoxDecoration(
+          color: colorScheme.error,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Icon(Icons.delete, color: colorScheme.onError),
+      ),
+      confirmDismiss: (direction) => _confirmDelete(product),
+      onDismissed: (direction) => _deleteProduct(product),
+      child: tile,
     );
   }
 }
