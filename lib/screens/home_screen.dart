@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:toastification/toastification.dart';
@@ -24,8 +26,13 @@ class _HomeScreenState extends State<HomeScreen> {
         fromJson: ProductModel.fromJson,
       );
 
+  final TextEditingController _searchController = TextEditingController();
+
   List<ProductModel> _products = [];
   bool _isLoading = true;
+
+  Timer? _debounce;
+  String _searchValue = '';
 
   @override
   void initState() {
@@ -33,10 +40,30 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadProducts();
   }
 
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _searchValue = value.trim();
+      _loadProducts();
+    });
+  }
+
   void _loadProducts() async {
     try {
+      final Map<String, String> queryParams = {};
+      if (_searchValue.isNotEmpty) {
+        queryParams['search_value'] = _searchValue;
+      }
+
       final PaginatedResponse<ProductModel> response = await _productRepository
-          .getAll();
+          .getAll(queryParams: queryParams.isEmpty ? null : queryParams);
 
       if (!mounted) {
         return;
@@ -115,7 +142,23 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Liste des produits'),
       ),
       backgroundColor: colorScheme.surface,
-      body: _buildBody(),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              decoration: const InputDecoration(
+                hintText: 'Rechercher un produit',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await context.push(rtProductCreate);
@@ -140,8 +183,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (_products.isEmpty) {
-      return const Center(
-        child: Text('Aucun produit pour le moment'),
+      return Center(
+        child: Text(
+          _searchValue.isEmpty
+              ? 'Aucun produit pour le moment'
+              : 'Aucun produit trouvé',
+        ),
       );
     }
 
