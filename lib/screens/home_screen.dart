@@ -9,8 +9,10 @@ import '../api/models/product_model.dart';
 import '../api/repositories/model_repository.dart';
 import '../config/routes.dart';
 import '../helpers/exceptions.dart';
+import '../services/storage_service.dart';
 import '../services/toast_service.dart';
 import '../widgets/animated_entrance.dart';
+import '../widgets/products/product_grid_card.dart';
 import '../widgets/products/product_tile.dart';
 import '../widgets/products/product_tile_skeleton.dart';
 
@@ -43,6 +45,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _debounce;
   String _searchValue = '';
 
+  bool _isGridView = false;
+
   double? _priceMin;
   double? _priceMax;
   RangeValues? _priceRange;
@@ -55,7 +59,31 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _loadViewPreference();
     _loadProducts();
+  }
+
+  void _loadViewPreference() async {
+    final String? value = await StorageService.get(StorageKey.viewMode);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _isGridView = value == 'grid');
+  }
+
+  void _toggleView() {
+    setState(() => _isGridView = !_isGridView);
+    StorageService.save(StorageKey.viewMode, _isGridView ? 'grid' : 'list');
+  }
+
+  void _onDeletePressed(ProductModel product) async {
+    final bool confirmed = await _confirmDelete(product);
+
+    if (confirmed) {
+      _deleteProduct(product);
+    }
   }
 
   @override
@@ -109,6 +137,15 @@ class _HomeScreenState extends State<HomeScreen> {
         _hasMore = _products.length < response.count;
         _isLoading = false;
       });
+
+      // Avec un filtre actif, on charge tout pour filtrer sur l'ensemble
+      // (et éviter un loader de pagination qui ne peut pas se déclencher).
+      if (_hasActiveFilters && _hasMore) {
+        await _loadRemaining();
+        if (mounted) {
+          setState(() {});
+        }
+      }
     } on ApiException catch (e) {
       if (!mounted) {
         return;
@@ -238,6 +275,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
+  Future<void> _loadRemaining() async {
+    while (_hasMore && mounted) {
+      final int nextPage = _page + 1;
+      final PaginatedResponse<ProductModel> response = await _fetchPage(
+        nextPage,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _page = nextPage;
+      _products.addAll(response.rows);
+      _hasMore = _products.length < response.count;
+    }
+  }
+
   void _ensurePriceBounds() async {
     if (_priceMax != null || _loadingBounds) {
       return;
@@ -246,28 +300,21 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _loadingBounds = true);
 
     try {
-      final List<ProductModel> all = [];
-      int page = 1;
+      // On charge tout pour des bornes et un filtrage complets (sinon le
+      // filtre ne porterait que sur les produits déjà paginés).
+      await _loadRemaining();
 
-      while (page <= 50) {
-        final PaginatedResponse<ProductModel> response =
-            await _productRepository.getAll(
-              queryParams: {'page': page.toString()},
-            );
-
-        all.addAll(response.rows);
-
-        if (response.rows.isEmpty || all.length >= response.count) {
-          break;
-        }
-        page++;
-      }
-
-      if (!mounted || all.isEmpty) {
+      if (!mounted) {
         return;
       }
 
-      final List<double> prices = all.map((p) => p.price).toList()..sort();
+      if (_products.isEmpty) {
+        setState(() => _loadingBounds = false);
+        return;
+      }
+
+      final List<double> prices = _products.map((p) => p.price).toList()
+        ..sort();
 
       setState(() {
         _priceMin = prices.first;
@@ -353,6 +400,10 @@ class _HomeScreenState extends State<HomeScreen> {
       foregroundColor: colorScheme.onPrimary,
       surfaceTintColor: Colors.transparent,
       actions: [
+        IconButton(
+          onPressed: _toggleView,
+          icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
+        ),
         Builder(
           builder: (BuildContext context) {
             return IconButton(
@@ -551,21 +602,58 @@ class _HomeScreenState extends State<HomeScreen> {
     return [
       SliverPadding(
         padding: const EdgeInsets.all(16),
-        sliver: SliverList.builder(
-          itemCount: visible.length + (_hasMore ? 1 : 0),
-          itemBuilder: (BuildContext context, int index) {
-            if (index >= visible.length) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-
-            return _buildTile(visible[index]);
-          },
-        ),
+        sliver: _isGridView
+            ? SliverGrid.builder(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 240,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.74,
+                ),
+                itemCount: visible.length,
+                itemBuilder: (BuildContext context, int index) {
+                  return _buildGridCard(visible[index]);
+                },
+              )
+            : SliverList.builder(
+                itemCount: visible.length,
+                itemBuilder: (BuildContext context, int index) {
+                  return _buildTile(visible[index]);
+                },
+              ),
       ),
+      if (_hasMore)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ),
     ];
+  }
+
+  Widget _buildGridCard(ProductModel product) {
+    final bool animate = _animatedIds.add(product.id);
+
+    Widget card = ProductGridCard(
+      product: product,
+      onTap: () async {
+        await context.push('/products/${product.id}/edit');
+
+        if (!mounted) {
+          return;
+        }
+
+        _loadProducts();
+      },
+      onDelete: () => _onDeletePressed(product),
+    );
+
+    if (animate) {
+      card = AnimatedEntrance(child: card);
+    }
+
+    return card;
   }
 
   Widget _buildTile(ProductModel product) {

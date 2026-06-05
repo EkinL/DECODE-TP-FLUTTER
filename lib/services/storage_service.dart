@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum StorageKey {
   token(value: 'token'),
+  viewMode(value: 'view_mode'),
   ;
 
   final String value;
