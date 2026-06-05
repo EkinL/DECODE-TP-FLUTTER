@@ -150,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _confirmDelete(ProductModel product) async {
+  Future<bool> _confirmDelete(ProductModel product) async {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -171,9 +171,13 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
 
-    if (confirmed != true) {
-      return;
-    }
+    return confirmed == true;
+  }
+
+  void _deleteProduct(ProductModel product) async {
+    setState(() {
+      _products.removeWhere((p) => p.id == product.id);
+    });
 
     try {
       await _productRepository.delete(product.id);
@@ -186,13 +190,12 @@ class _HomeScreenState extends State<HomeScreen> {
         'Produit supprimé',
         type: ToastificationType.success,
       );
-
-      _loadProducts();
     } on ApiException catch (e) {
       if (!mounted) {
         return;
       }
       ToastService.showToast(e.message);
+      _loadProducts();
     }
   }
 
@@ -274,18 +277,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final ProductModel product = _products[index];
 
-        return ProductTile(
-          product: product,
-          onTap: () async {
-            await context.push('/products/${product.id}/edit');
+        return Dismissible(
+          key: ValueKey(product.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.delete, color: Colors.white),
+          ),
+          confirmDismiss: (direction) => _confirmDelete(product),
+          onDismissed: (direction) => _deleteProduct(product),
+          child: ProductTile(
+            product: product,
+            onTap: () async {
+              await context.push('/products/${product.id}/edit');
 
-            if (!mounted) {
-              return;
-            }
+              if (!mounted) {
+                return;
+              }
 
-            _loadProducts();
-          },
-          onDelete: () => _confirmDelete(product),
+              _loadProducts();
+            },
+          ),
         );
       },
     );
