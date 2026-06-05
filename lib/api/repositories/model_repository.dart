@@ -39,6 +39,14 @@ class ModelRepository<T> {
     );
   }
 
+  Future<void> deleteMany(List<String> ids) {
+    return ApiService().request(
+      uri: uri,
+      httpMethod: HttpMethod.delete,
+      data: {'ids': ids},
+    );
+  }
+
   Future<T> get(String id) {
     return ApiService().request(
       uri: uri,

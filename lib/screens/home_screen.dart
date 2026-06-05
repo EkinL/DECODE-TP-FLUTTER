@@ -47,6 +47,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isGridView = false;
 
+  bool _selectionMode = false;
+  final Set<String> _selectedIds = {};
+
   double? _priceMin;
   double? _priceMax;
   RangeValues? _priceRange;
@@ -83,6 +86,102 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (confirmed) {
       _deleteProduct(product);
+    }
+  }
+
+  void _onTileTap(ProductModel product) async {
+    if (_selectionMode) {
+      _toggleSelection(product.id);
+      return;
+    }
+
+    await context.push('/products/${product.id}/edit');
+
+    if (!mounted) {
+      return;
+    }
+
+    _loadProducts();
+  }
+
+  void _enterSelection(String id) {
+    setState(() {
+      _selectionMode = true;
+      _selectedIds.add(id);
+    });
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (!_selectedIds.add(id)) {
+        _selectedIds.remove(id);
+      }
+    });
+  }
+
+  void _exitSelection() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  void _selectAllVisible() {
+    setState(() {
+      _selectedIds.addAll(_applyFilters(_products).map((p) => p.id));
+    });
+  }
+
+  void _bulkDelete() async {
+    final List<String> ids = _selectedIds.toList();
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Supprimer la sélection'),
+          content: Text('Supprimer ${ids.length} produit(s) ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Supprimer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _products.removeWhere((p) => ids.contains(p.id));
+      _selectionMode = false;
+      _selectedIds.clear();
+    });
+
+    try {
+      await _productRepository.deleteMany(ids);
+
+      if (!mounted) {
+        return;
+      }
+
+      ToastService.showToast(
+        '${ids.length} produit(s) supprimé(s)',
+        type: ToastificationType.success,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ToastService.showToast(e.message);
+      _loadProducts();
     }
   }
 
@@ -381,23 +480,51 @@ class _HomeScreenState extends State<HomeScreen> {
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          _buildSliverAppBar(colorScheme),
+          _selectionMode
+              ? _buildSelectionAppBar(colorScheme)
+              : _buildSliverAppBar(colorScheme),
           ..._buildContentSlivers(),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await context.push(rtProductCreate);
+      floatingActionButton: _selectionMode
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () async {
+                await context.push(rtProductCreate);
 
-          if (!mounted) {
-            return;
-          }
+                if (!mounted) {
+                  return;
+                }
 
-          _loadProducts();
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Ajouter un produit'),
+                _loadProducts();
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter un produit'),
+            ),
+    );
+  }
+
+  Widget _buildSelectionAppBar(ColorScheme colorScheme) {
+    return SliverAppBar(
+      pinned: true,
+      backgroundColor: colorScheme.primary,
+      foregroundColor: colorScheme.onPrimary,
+      surfaceTintColor: Colors.transparent,
+      leading: IconButton(
+        onPressed: _exitSelection,
+        icon: const Icon(Icons.close),
       ),
+      title: Text('${_selectedIds.length} sélectionné(s)'),
+      actions: [
+        IconButton(
+          onPressed: _selectAllVisible,
+          icon: const Icon(Icons.select_all),
+        ),
+        IconButton(
+          onPressed: _selectedIds.isEmpty ? null : _bulkDelete,
+          icon: const Icon(Icons.delete),
+        ),
+      ],
     );
   }
 
@@ -646,15 +773,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     Widget card = ProductGridCard(
       product: product,
-      onTap: () async {
-        await context.push('/products/${product.id}/edit');
-
-        if (!mounted) {
-          return;
-        }
-
-        _loadProducts();
-      },
+      selected: _selectedIds.contains(product.id),
+      onTap: () => _onTileTap(product),
+      onLongPress: () => _enterSelection(product.id),
       onDelete: () => _onDeletePressed(product),
     );
 
@@ -671,19 +792,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
     Widget tile = ProductTile(
       product: product,
-      onTap: () async {
-        await context.push('/products/${product.id}/edit');
-
-        if (!mounted) {
-          return;
-        }
-
-        _loadProducts();
-      },
+      selected: _selectedIds.contains(product.id),
+      onTap: () => _onTileTap(product),
+      onLongPress: () => _enterSelection(product.id),
     );
 
     if (animate) {
       tile = AnimatedEntrance(child: tile);
+    }
+
+    // En mode sélection, on désactive le swipe-to-delete
+    if (_selectionMode) {
+      return tile;
     }
 
     return Dismissible(

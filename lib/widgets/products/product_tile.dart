@@ -3,10 +3,18 @@ import 'package:flutter/material.dart';
 import '../../api/models/product_model.dart';
 
 class ProductTile extends StatelessWidget {
-  const ProductTile({required this.product, required this.onTap, super.key});
+  const ProductTile({
+    required this.product,
+    required this.onTap,
+    this.onLongPress,
+    this.selected = false,
+    super.key,
+  });
 
   final ProductModel product;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -15,8 +23,10 @@ class ProductTile extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: selected ? colorScheme.primaryContainer : null,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -72,7 +82,12 @@ class ProductTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+              selected
+                  ? Icon(Icons.check_circle, color: colorScheme.primary)
+                  : Icon(
+                      Icons.chevron_right,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
             ],
           ),
         ),
