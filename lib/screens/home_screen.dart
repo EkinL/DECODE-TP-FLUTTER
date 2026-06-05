@@ -182,7 +182,8 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _page = nextPage;
         _products.addAll(response.rows);
-        _hasMore = _products.length < response.count;
+        _hasMore =
+            response.rows.isNotEmpty && _products.length < response.count;
         _isLoadingMore = false;
       });
     } on ApiException catch (e) {
@@ -287,47 +288,55 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       _page = nextPage;
+
+      // Garde-fou : si une page revient vide, on arrête (évite une boucle
+      // infinie si le count ne correspond pas exactement aux lignes).
+      if (response.rows.isEmpty) {
+        _hasMore = false;
+        return;
+      }
+
       _products.addAll(response.rows);
       _hasMore = _products.length < response.count;
     }
   }
 
   void _ensurePriceBounds() async {
-    if (_priceMax != null || _loadingBounds) {
+    if (_loadingBounds) {
       return;
     }
 
-    setState(() => _loadingBounds = true);
+    // On charge tout pour filtrer sur l'ensemble (et non sur les seules
+    // pages déjà paginées). À refaire si une recherche a relancé la pagination.
+    if (_hasMore) {
+      setState(() => _loadingBounds = true);
 
-    try {
-      // On charge tout pour des bornes et un filtrage complets (sinon le
-      // filtre ne porterait que sur les produits déjà paginés).
-      await _loadRemaining();
+      try {
+        await _loadRemaining();
+      } on ApiException catch (e) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _loadingBounds = false);
+        ToastService.showToast(e.message);
+        return;
+      }
 
       if (!mounted) {
         return;
       }
+    }
 
-      if (_products.isEmpty) {
-        setState(() => _loadingBounds = false);
-        return;
-      }
-
+    if (_priceMax == null && _products.isNotEmpty) {
       final List<double> prices = _products.map((p) => p.price).toList()
         ..sort();
+      _priceMin = prices.first;
+      _priceMax = prices.last;
+      _priceRange = RangeValues(prices.first, prices.last);
+    }
 
-      setState(() {
-        _priceMin = prices.first;
-        _priceMax = prices.last;
-        _priceRange = RangeValues(prices.first, prices.last);
-        _loadingBounds = false;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) {
-        return;
-      }
+    if (mounted) {
       setState(() => _loadingBounds = false);
-      ToastService.showToast(e.message);
     }
   }
 
@@ -575,7 +584,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<ProductModel> visible = _applyFilters(_products);
 
     if (visible.isEmpty) {
-      if (_hasMore) {
+      if (_hasMore && !_hasActiveFilters) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _loadMore());
         return const [
           SliverFillRemaining(
@@ -622,7 +631,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
       ),
-      if (_hasMore)
+      if (_hasMore && !_hasActiveFilters)
         const SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.all(16),
